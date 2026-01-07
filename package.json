@@ -1,0 +1,21 @@
+{
+  "name": "claude-recorder",
+  "version": "2025.1.0",
+  "description": "Record and search Claude Code CLI activity",
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "status": "bun run src/index.ts status",
+    "watcher": "bun run src/watcher.ts",
+    "hook:start": "bun run src/hooks/session-start.ts",
+    "hook:end": "bun run src/hooks/session-end.ts",
+    "import": "bun run src/import-session.ts"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14"
+  }
+}
