@@ -12,6 +12,7 @@ Claude Recorder captures all Claude Code CLI activity by hooking into SessionSta
 bun status              # Check watcher status and quick stats
 bun start <command>     # Run CLI (list, show, search, export, stats, status)
 bun run import <path>   # Import a single transcript file
+bun test                # Run tests
 ```
 
 ## Architecture
