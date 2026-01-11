@@ -68,14 +68,19 @@ function processTranscript(transcriptPath: string): void {
   }
 
   const position = getFilePosition(transcriptPath);
-  const content = readFileSync(transcriptPath, "utf-8");
-  const currentSize = Buffer.byteLength(content, "utf-8");
+
+  // Read file as buffer to correctly handle byte positions
+  const buffer = readFileSync(transcriptPath);
+  const currentSize = buffer.length;
 
   if (currentSize <= position) {
     return; // No new content
   }
 
-  const newContent = content.slice(position);
+  // Slice by bytes, then convert to string
+  const newBuffer = buffer.subarray(position);
+  const newContent = newBuffer.toString("utf-8");
+
   const messages = parseTranscriptContent(newContent);
 
   log(`Processing ${messages.length} new messages from position ${position}`);
