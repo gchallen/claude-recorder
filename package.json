@@ -6,6 +6,7 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "status": "bun run src/index.ts status",
+    "stop": "bun run src/index.ts stop-all",
     "test": "bun test",
     "watcher": "bun run src/watcher.ts",
     "hook:start": "bun run src/hooks/session-start.ts",

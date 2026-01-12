@@ -46,10 +46,13 @@ function getSessionMetadata(transcriptPath: string): {
     try {
       const entry = JSON.parse(line) as TranscriptEntry;
       if (entry.type === "user" || entry.type === "assistant") {
+        // Derive slug from project path if not present in transcript
+        const projectPath = dirname(transcriptPath);
+        const derivedSlug = entry.slug || projectPath.split("/").pop() || "unknown";
         return {
           sessionId: entry.sessionId,
-          slug: entry.slug,
-          projectPath: dirname(transcriptPath),
+          slug: derivedSlug,
+          projectPath,
           workingDir: entry.cwd,
           version: entry.version,
         };

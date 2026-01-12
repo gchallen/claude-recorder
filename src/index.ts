@@ -7,6 +7,7 @@ import { exportCommand } from "./commands/export.js";
 import { statsCommand } from "./commands/stats.js";
 import { statusCommand } from "./commands/status.js";
 import { cleanupCommand } from "./commands/cleanup.js";
+import { stopCommand } from "./commands/stop.js";
 import { startWatcher, stopWatcher } from "./watcher.js";
 
 const program = new Command();
@@ -69,6 +70,13 @@ program
   .description("Remove stale PID files from dead watchers")
   .action(() => {
     cleanupCommand();
+  });
+
+program
+  .command("stop-all")
+  .description("Stop all running watchers")
+  .action(() => {
+    stopCommand();
   });
 
 program
