@@ -18,6 +18,12 @@ export function getDatabase(): Database {
   }
 
   db = new Database(DB_PATH);
+
+  // Enable WAL mode for better concurrency (allows reads while writing)
+  db.exec("PRAGMA journal_mode = WAL");
+  // Set busy timeout to wait up to 5 seconds if database is locked
+  db.exec("PRAGMA busy_timeout = 5000");
+
   initializeSchema(db);
   return db;
 }
