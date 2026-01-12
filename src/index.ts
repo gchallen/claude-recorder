@@ -8,7 +8,7 @@ import { statsCommand } from "./commands/stats.js";
 import { statusCommand } from "./commands/status.js";
 import { cleanupCommand } from "./commands/cleanup.js";
 import { stopCommand } from "./commands/stop.js";
-import { startDaemon } from "./watcher.js";
+import { startCommand } from "./commands/start.js";
 
 const program = new Command();
 
@@ -81,9 +81,9 @@ program
 
 program
   .command("start")
-  .description("Start the watcher daemon (usually done automatically by hooks)")
+  .description("Start the watcher daemon in background")
   .action(() => {
-    startDaemon();
+    startCommand();
   });
 
 program.parse();
