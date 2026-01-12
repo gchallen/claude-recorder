@@ -4,9 +4,10 @@
   "description": "Record and search Claude Code CLI activity",
   "type": "module",
   "scripts": {
-    "start": "bun run src/index.ts",
+    "cli": "bun run src/index.ts",
+    "start": "bun run src/index.ts start",
+    "stop": "bun run src/index.ts stop",
     "status": "bun run src/index.ts status",
-    "stop": "bun run src/index.ts stop-all",
     "test": "bun test",
     "watcher": "bun run src/watcher.ts",
     "hook:start": "bun run src/hooks/session-start.ts",
