@@ -8,7 +8,7 @@ import { statsCommand } from "./commands/stats.js";
 import { statusCommand } from "./commands/status.js";
 import { cleanupCommand } from "./commands/cleanup.js";
 import { stopCommand } from "./commands/stop.js";
-import { startWatcher, stopWatcher } from "./watcher.js";
+import { startDaemon } from "./watcher.js";
 
 const program = new Command();
 
@@ -60,38 +60,30 @@ program
 
 program
   .command("status")
-  .description("Check watcher status and show quick summary")
+  .description("Check daemon status and show quick summary")
   .action(() => {
     statusCommand();
   });
 
 program
   .command("cleanup")
-  .description("Remove stale PID files from dead watchers")
+  .description("Remove stale PID files and orphaned session registrations")
   .action(() => {
     cleanupCommand();
   });
 
 program
-  .command("stop-all")
-  .description("Stop all running watchers")
+  .command("stop")
+  .description("Stop the watcher daemon")
   .action(() => {
     stopCommand();
   });
 
 program
-  .command("watch <session_id> <transcript_path>")
-  .description("Start watching a transcript file (used by hooks)")
-  .action((sessionId, transcriptPath) => {
-    startWatcher(sessionId, transcriptPath);
-  });
-
-program
-  .command("stop <session_id>")
-  .description("Stop watching a session (used by hooks)")
-  .action((sessionId) => {
-    const stopped = stopWatcher(sessionId);
-    process.exit(stopped ? 0 : 1);
+  .command("start")
+  .description("Start the watcher daemon (usually done automatically by hooks)")
+  .action(() => {
+    startDaemon();
   });
 
 program.parse();

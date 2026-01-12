@@ -3,40 +3,10 @@ import { readdirSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { getStats, listRecentlyActiveSessions } from "../storage.js";
+import { getDaemonPid, getRegisteredSessions } from "../watcher.js";
 
-const RUN_DIR = join(homedir(), ".claude-recorder", "run");
 const LOG_FILE = join(homedir(), ".claude-recorder", "logs", "hooks.log");
-
-interface WatcherInfo {
-  sessionId: string;
-  pid: number;
-  running: boolean;
-}
-
-function getRunningWatchers(): WatcherInfo[] {
-  if (!existsSync(RUN_DIR)) return [];
-
-  const watchers: WatcherInfo[] = [];
-  const files = readdirSync(RUN_DIR).filter((f) => f.endsWith(".pid"));
-
-  for (const file of files) {
-    const sessionId = file.replace(".pid", "");
-    const pidFile = join(RUN_DIR, file);
-    const pid = parseInt(readFileSync(pidFile, "utf-8").trim());
-
-    let running = false;
-    try {
-      process.kill(pid, 0); // Check if process exists
-      running = true;
-    } catch {
-      running = false;
-    }
-
-    watchers.push({ sessionId, pid, running });
-  }
-
-  return watchers;
-}
+const SESSIONS_DIR = join(homedir(), ".claude-recorder", "run", "sessions");
 
 function getRecentLogs(lines = 5): string[] {
   if (!existsSync(LOG_FILE)) return [];
@@ -61,30 +31,65 @@ function formatRelativeTime(date: Date): string {
   return date.toLocaleDateString();
 }
 
+function getSessionTranscriptPaths(): Map<string, string> {
+  const paths = new Map<string, string>();
+  if (!existsSync(SESSIONS_DIR)) return paths;
+
+  const files = readdirSync(SESSIONS_DIR);
+  for (const file of files) {
+    try {
+      const transcriptPath = readFileSync(join(SESSIONS_DIR, file), "utf-8").trim();
+      paths.set(file, transcriptPath);
+    } catch {
+      // Ignore read errors
+    }
+  }
+  return paths;
+}
+
 export function statusCommand(): void {
   console.log(chalk.bold("\nClaude Recorder Status\n"));
 
-  // Check watchers
-  const watchers = getRunningWatchers();
-  const activeWatchers = watchers.filter((w) => w.running);
-  const staleWatchers = watchers.filter((w) => !w.running);
+  // Check daemon
+  const daemonPid = getDaemonPid();
+  const registeredSessions = getRegisteredSessions();
 
-  console.log(chalk.cyan("Watchers:"));
-  if (activeWatchers.length === 0 && staleWatchers.length === 0) {
-    console.log(chalk.gray("  No watchers registered"));
+  console.log(chalk.cyan("Daemon:"));
+  if (daemonPid) {
+    console.log(`  ${chalk.green("●")} Running ${chalk.gray(`(PID ${daemonPid})`)}`);
+    console.log(`  ${chalk.white(registeredSessions.length)} active session(s)`);
   } else {
-    for (const w of activeWatchers) {
-      console.log(
-        `  ${chalk.green("●")} ${w.sessionId.slice(0, 8)} ${chalk.gray(`(PID ${w.pid})`)}`
-      );
-    }
-    for (const w of staleWatchers) {
-      console.log(
-        `  ${chalk.red("○")} ${w.sessionId.slice(0, 8)} ${chalk.gray("(stale)")}`
-      );
-    }
+    console.log(`  ${chalk.gray("○")} Not running`);
   }
   console.log();
+
+  // Show active sessions being watched
+  if (registeredSessions.length > 0) {
+    const transcriptPaths = getSessionTranscriptPaths();
+    console.log(chalk.cyan("Active sessions:"));
+    for (const sessionId of registeredSessions) {
+      const transcriptPath = transcriptPaths.get(sessionId);
+      if (transcriptPath) {
+        // Extract working dir from transcript path
+        // Path format: ~/.claude/projects/-Users-foo-bar/<session>.jsonl
+        // We want to show: ~/foo/bar
+        const home = homedir();
+        let projectDir = transcriptPath
+          .replace(/\/[^/]+\.jsonl$/, "") // Remove filename
+          .replace(/^.*\/\.claude\/projects\//, "") // Remove .claude/projects prefix
+          .replace(/^-/, "") // Remove leading dash
+          .replace(/-/g, "/"); // Convert dashes to slashes
+        // Replace home directory with ~
+        if (projectDir.startsWith(home.slice(1))) {
+          projectDir = "~" + projectDir.slice(home.length - 1);
+        }
+        console.log(`  ${chalk.green("●")} ${sessionId.slice(0, 8)} ${chalk.gray(projectDir)}`);
+      } else {
+        console.log(`  ${chalk.green("●")} ${sessionId.slice(0, 8)}`);
+      }
+    }
+    console.log();
+  }
 
   // Quick stats
   const stats = getStats();
@@ -100,7 +105,7 @@ export function statusCommand(): void {
   if (recent.length > 0) {
     console.log(chalk.cyan("Recently active sessions:"));
     for (const s of recent.slice(0, 5)) {
-      const active = activeWatchers.some((w) => w.sessionId === s.id);
+      const active = registeredSessions.includes(s.id);
       const indicator = active ? chalk.green("●") : chalk.gray("○");
       const lastActive = s.lastActivity
         ? formatRelativeTime(s.lastActivity)

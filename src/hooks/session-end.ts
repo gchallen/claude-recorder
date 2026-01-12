@@ -3,16 +3,16 @@
  * SessionEnd hook for Claude Code
  *
  * Receives JSON via stdin with session_id.
- * Signals the watcher to stop and do final capture.
+ * Unregisters the session so the daemon stops watching it.
  */
 
-import { existsSync, readFileSync, mkdirSync, appendFileSync, unlinkSync } from "fs";
+import { existsSync, mkdirSync, appendFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
+import { unregisterSession } from "../watcher.js";
 import type { HookInput } from "../types.js";
 
 const LOG_DIR = join(homedir(), ".claude-recorder", "logs");
-const RUN_DIR = join(homedir(), ".claude-recorder", "run");
 
 function log(message: string): void {
   if (!existsSync(LOG_DIR)) {
@@ -21,42 +21,6 @@ function log(message: string): void {
   const timestamp = new Date().toISOString();
   const logLine = `[${timestamp}] session-end: ${message}\n`;
   appendFileSync(join(LOG_DIR, "hooks.log"), logLine);
-}
-
-function stopWatcher(sessionId: string): boolean {
-  const pidFile = join(RUN_DIR, `${sessionId}.pid`);
-  if (!existsSync(pidFile)) {
-    log(`No PID file found for session ${sessionId}`);
-    return false;
-  }
-
-  try {
-    const pid = parseInt(readFileSync(pidFile, "utf-8").trim());
-    log(`Sending SIGTERM to watcher PID ${pid}`);
-    process.kill(pid, "SIGTERM");
-
-    // Clean up PID file after a short delay
-    setTimeout(() => {
-      try {
-        if (existsSync(pidFile)) {
-          unlinkSync(pidFile);
-        }
-      } catch {
-        // Ignore
-      }
-    }, 1000);
-
-    return true;
-  } catch (err) {
-    log(`Failed to stop watcher: ${err}`);
-    // Clean up stale PID file
-    try {
-      unlinkSync(pidFile);
-    } catch {
-      // Ignore
-    }
-    return false;
-  }
 }
 
 async function main(): Promise<void> {
@@ -78,8 +42,10 @@ async function main(): Promise<void> {
   }
 
   log(`Ending session ${session_id}`);
-  const stopped = stopWatcher(session_id);
-  log(stopped ? "Watcher stopped" : "Watcher was not running");
+
+  // Unregister the session - daemon will detect this and finalize
+  unregisterSession(session_id);
+  log("Session unregistered");
 }
 
 main().catch((err) => {

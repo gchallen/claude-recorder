@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { watch, existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync } from "fs";
 import { homedir } from "os";
 import { join, dirname } from "path";
 import { parseTranscriptContent } from "./parser.js";
@@ -14,16 +14,18 @@ import {
 import type { TranscriptEntry } from "./types.js";
 
 const RUN_DIR = join(homedir(), ".claude-recorder", "run");
+const SESSIONS_DIR = join(RUN_DIR, "sessions");
+const PID_FILE = join(RUN_DIR, "watcher.pid");
 const POLL_INTERVAL_MS = 5000; // 5 seconds
 
-interface WatcherState {
+interface WatchedSession {
   sessionId: string;
   transcriptPath: string;
   projectPath: string;
-  running: boolean;
 }
 
-let state: WatcherState | null = null;
+// Currently watched sessions
+const watchedSessions = new Map<string, WatchedSession>();
 
 function log(message: string): void {
   const timestamp = new Date().toISOString();
@@ -46,7 +48,6 @@ function getSessionMetadata(transcriptPath: string): {
     try {
       const entry = JSON.parse(line) as TranscriptEntry;
       if (entry.type === "user" || entry.type === "assistant") {
-        // Derive slug from project path if not present in transcript
         const projectPath = dirname(transcriptPath);
         const derivedSlug = entry.slug || projectPath.split("/").pop() || "unknown";
         return {
@@ -64,9 +65,10 @@ function getSessionMetadata(transcriptPath: string): {
   return null;
 }
 
-function processTranscript(transcriptPath: string): void {
+function processTranscript(session: WatchedSession): void {
+  const { transcriptPath } = session;
+
   if (!existsSync(transcriptPath)) {
-    log(`Transcript file not found: ${transcriptPath}`);
     return;
   }
 
@@ -86,111 +88,199 @@ function processTranscript(transcriptPath: string): void {
 
   const messages = parseTranscriptContent(newContent);
 
-  log(`Processing ${messages.length} new messages from position ${position}`);
-
-  for (const message of messages) {
-    insertMessage(message);
+  if (messages.length > 0) {
+    log(`[${session.sessionId.slice(0, 8)}] Processing ${messages.length} new messages`);
+    for (const message of messages) {
+      insertMessage(message);
+    }
   }
 
   setFilePosition(transcriptPath, currentSize);
 }
 
-function writePidFile(sessionId: string): void {
+function scanForSessions(): void {
+  if (!existsSync(SESSIONS_DIR)) {
+    return;
+  }
+
+  const files = readdirSync(SESSIONS_DIR);
+  const activeSessionIds = new Set<string>();
+
+  // Check for new sessions
+  for (const file of files) {
+    const sessionId = file;
+    activeSessionIds.add(sessionId);
+
+    if (!watchedSessions.has(sessionId)) {
+      // New session to watch
+      const sessionFile = join(SESSIONS_DIR, file);
+      try {
+        const transcriptPath = readFileSync(sessionFile, "utf-8").trim();
+
+        if (!existsSync(transcriptPath)) {
+          log(`[${sessionId.slice(0, 8)}] Transcript not found: ${transcriptPath}`);
+          continue;
+        }
+
+        const metadata = getSessionMetadata(transcriptPath);
+        if (metadata) {
+          upsertSession(
+            metadata.sessionId,
+            metadata.slug,
+            metadata.projectPath,
+            metadata.workingDir,
+            new Date(),
+            metadata.version,
+            transcriptPath
+          );
+        }
+
+        const session: WatchedSession = {
+          sessionId,
+          transcriptPath,
+          projectPath: metadata?.projectPath ?? dirname(transcriptPath),
+        };
+
+        watchedSessions.set(sessionId, session);
+        log(`[${sessionId.slice(0, 8)}] Now watching: ${transcriptPath}`);
+
+        // Initial processing
+        processTranscript(session);
+      } catch (err) {
+        log(`[${sessionId.slice(0, 8)}] Error reading session file: ${err}`);
+      }
+    }
+  }
+
+  // Check for ended sessions
+  for (const [sessionId, session] of watchedSessions) {
+    if (!activeSessionIds.has(sessionId)) {
+      // Session ended, do final processing
+      log(`[${sessionId.slice(0, 8)}] Session ended, finalizing`);
+      processTranscript(session);
+      endSession(sessionId, new Date());
+      watchedSessions.delete(sessionId);
+    }
+  }
+}
+
+function writePidFile(): void {
   if (!existsSync(RUN_DIR)) {
     mkdirSync(RUN_DIR, { recursive: true });
   }
-  const pidFile = join(RUN_DIR, `${sessionId}.pid`);
-  writeFileSync(pidFile, process.pid.toString());
+  writeFileSync(PID_FILE, process.pid.toString());
 }
 
-function removePidFile(sessionId: string): void {
-  const pidFile = join(RUN_DIR, `${sessionId}.pid`);
-  if (existsSync(pidFile)) {
-    Bun.file(pidFile).delete;
+function removePidFile(): void {
+  if (existsSync(PID_FILE)) {
     try {
-      require("fs").unlinkSync(pidFile);
+      unlinkSync(PID_FILE);
     } catch {
       // Ignore
     }
   }
 }
 
-export function startWatcher(
-  sessionId: string,
-  transcriptPath: string
-): void {
-  if (state?.running) {
-    log(`Watcher already running for session ${state.sessionId}`);
+export function isDaemonRunning(): boolean {
+  if (!existsSync(PID_FILE)) {
+    return false;
+  }
+
+  try {
+    const pid = parseInt(readFileSync(PID_FILE, "utf-8").trim());
+    process.kill(pid, 0); // Check if running
+    return true;
+  } catch {
+    // Process not running, clean up stale PID file
+    try {
+      unlinkSync(PID_FILE);
+    } catch {
+      // Ignore
+    }
+    return false;
+  }
+}
+
+export function getDaemonPid(): number | null {
+  if (!existsSync(PID_FILE)) {
+    return null;
+  }
+
+  try {
+    const pid = parseInt(readFileSync(PID_FILE, "utf-8").trim());
+    process.kill(pid, 0); // Check if running
+    return pid;
+  } catch {
+    return null;
+  }
+}
+
+export function registerSession(sessionId: string, transcriptPath: string): void {
+  if (!existsSync(SESSIONS_DIR)) {
+    mkdirSync(SESSIONS_DIR, { recursive: true });
+  }
+  const sessionFile = join(SESSIONS_DIR, sessionId);
+  writeFileSync(sessionFile, transcriptPath);
+}
+
+export function unregisterSession(sessionId: string): void {
+  const sessionFile = join(SESSIONS_DIR, sessionId);
+  if (existsSync(sessionFile)) {
+    try {
+      unlinkSync(sessionFile);
+    } catch {
+      // Ignore
+    }
+  }
+}
+
+export function getRegisteredSessions(): string[] {
+  if (!existsSync(SESSIONS_DIR)) {
+    return [];
+  }
+  return readdirSync(SESSIONS_DIR);
+}
+
+export function startDaemon(): void {
+  if (isDaemonRunning()) {
+    log("Daemon already running");
     return;
   }
 
-  log(`Starting watcher for session ${sessionId}`);
-  log(`Transcript path: ${transcriptPath}`);
+  log("Starting watcher daemon");
 
   // Initialize database
   getDatabase();
 
-  // Get session metadata and create session record
-  const metadata = getSessionMetadata(transcriptPath);
-  if (metadata) {
-    upsertSession(
-      metadata.sessionId,
-      metadata.slug,
-      metadata.projectPath,
-      metadata.workingDir,
-      new Date(),
-      metadata.version,
-      transcriptPath
-    );
-  }
+  writePidFile();
 
-  state = {
-    sessionId,
-    transcriptPath,
-    projectPath: metadata?.projectPath ?? dirname(transcriptPath),
-    running: true,
-  };
+  // Initial scan
+  scanForSessions();
 
-  writePidFile(sessionId);
-
-  // Initial processing
-  processTranscript(transcriptPath);
-
-  // Set up file watcher with polling fallback
-  let watcher: ReturnType<typeof watch> | null = null;
-
-  try {
-    watcher = watch(transcriptPath, (eventType) => {
-      if (eventType === "change" && state?.running) {
-        processTranscript(transcriptPath);
-      }
-    });
-    log("File watcher started");
-  } catch (err) {
-    log(`File watcher failed, using polling: ${err}`);
-  }
-
-  // Polling fallback (also serves as periodic backup)
+  // Poll for changes
   const pollInterval = setInterval(() => {
-    if (state?.running) {
-      processTranscript(transcriptPath);
+    // Scan for new/ended sessions
+    scanForSessions();
+
+    // Process all watched sessions
+    for (const session of watchedSessions.values()) {
+      processTranscript(session);
     }
   }, POLL_INTERVAL_MS);
 
   // Handle shutdown signals
   const shutdown = () => {
-    log("Shutting down watcher");
-    state!.running = false;
-
-    if (watcher) watcher.close();
+    log("Shutting down daemon");
     clearInterval(pollInterval);
 
-    // Final processing
-    processTranscript(transcriptPath);
-    endSession(sessionId, new Date());
-    removePidFile(sessionId);
+    // Final processing for all sessions
+    for (const session of watchedSessions.values()) {
+      processTranscript(session);
+      endSession(session.sessionId, new Date());
+    }
 
-    log("Watcher stopped");
+    removePidFile();
+    log("Daemon stopped");
     process.exit(0);
   };
 
@@ -198,46 +288,46 @@ export function startWatcher(
   process.on("SIGINT", shutdown);
   process.on("SIGHUP", shutdown);
 
-  log("Watcher running. Send SIGTERM to stop.");
+  log(`Daemon running (PID ${process.pid}). Watching ${watchedSessions.size} session(s).`);
 }
 
-export function stopWatcher(sessionId: string): boolean {
-  const pidFile = join(RUN_DIR, `${sessionId}.pid`);
-  if (!existsSync(pidFile)) {
+export function stopDaemon(): boolean {
+  const pid = getDaemonPid();
+  if (!pid) {
     return false;
   }
 
-  const pid = parseInt(readFileSync(pidFile, "utf-8").trim());
   try {
     process.kill(pid, "SIGTERM");
     return true;
   } catch {
-    // Process may already be dead, clean up pid file
-    try {
-      require("fs").unlinkSync(pidFile);
-    } catch {
-      // Ignore
-    }
+    removePidFile();
     return false;
   }
 }
 
-// CLI mode: start watcher with arguments
+// CLI mode
 if (import.meta.main) {
   const args = process.argv.slice(2);
 
-  if (args[0] === "stop" && args[1]) {
-    const stopped = stopWatcher(args[1]);
-    console.log(stopped ? "Watcher stopped" : "Watcher not found");
+  if (args[0] === "stop") {
+    const stopped = stopDaemon();
+    console.log(stopped ? "Daemon stopped" : "Daemon not running");
     process.exit(stopped ? 0 : 1);
   }
 
-  if (args.length < 2) {
-    console.error("Usage: bun watcher.ts <session_id> <transcript_path>");
-    console.error("       bun watcher.ts stop <session_id>");
-    process.exit(1);
+  if (args[0] === "status") {
+    const pid = getDaemonPid();
+    if (pid) {
+      console.log(`Daemon running (PID ${pid})`);
+      const sessions = getRegisteredSessions();
+      console.log(`Watching ${sessions.length} session(s)`);
+    } else {
+      console.log("Daemon not running");
+    }
+    process.exit(0);
   }
 
-  const [sessionId, transcriptPath] = args;
-  startWatcher(sessionId, transcriptPath);
+  // Default: start daemon
+  startDaemon();
 }
