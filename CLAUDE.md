@@ -12,9 +12,23 @@ Claude Recorder captures all Claude Code CLI activity by hooking into SessionSta
 bun start               # Start the watcher daemon
 bun stop                # Stop the watcher daemon
 bun status              # Check daemon status and quick stats
-bun cli <command>       # Run CLI (list, show, search, export, stats)
+bun cli <command>       # Run CLI commands (see below)
 bun run import <path>   # Import a single transcript file
-bun test                # Run tests
+bun run src/import-all.ts  # Import all existing sessions
+
+bun test                # Run all tests
+bun test src/parser.test.ts  # Run a single test file
+```
+
+### CLI Commands
+
+```bash
+bun cli list [-l <limit>]              # List recent sessions
+bun cli show <session> [-t] [--thinking]  # Show session (by ID, short ID, or index 0=most recent)
+bun cli search <query> [-l <limit>]    # Full-text search across sessions
+bun cli export <session> [-f md|json] [-o file]  # Export session
+bun cli stats                          # Show recording statistics
+bun cli cleanup                        # Remove stale PID files
 ```
 
 ## Architecture
@@ -33,6 +47,12 @@ bun test                # Run tests
 - `src/commands/` - CLI commands (list, show, search, export, stats, status)
 
 **Transcript Format:** Each JSONL line has `type` (user/assistant), `uuid`, `sessionId`, `timestamp`, `message.content` (string for user, ContentBlock[] for assistant with text/thinking/tool_use/tool_result blocks).
+
+**Database Schema:** Three main tables in SQLite:
+- `sessions` - Session metadata (id, slug, project_path, working_dir, timestamps, transcript_path)
+- `messages` - Parsed messages (uuid, session_id, role, text_content, thinking_content, model)
+- `tool_calls` - Tool invocations (tool_id, message_uuid, name, input, output)
+- `messages_fts` - FTS5 virtual table for full-text search on message content
 
 ## Configuration
 
