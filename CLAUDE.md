@@ -29,6 +29,8 @@ bun cli search <query> [-l <limit>]    # Full-text search across sessions
 bun cli export <session> [-f md|json] [-o file]  # Export session
 bun cli stats                          # Show recording statistics
 bun cli cleanup                        # Remove stale PID files
+bun cli install-hook                   # Install pre-commit hook for auto-export
+bun cli uninstall-hook                 # Remove pre-commit hook
 ```
 
 ## Architecture
@@ -44,7 +46,10 @@ bun cli cleanup                        # Remove stale PID files
 - `src/watcher.ts` - Single daemon process that monitors all transcript files, uses `~/.claude-recorder/run/watcher.pid` and session registration in `~/.claude-recorder/run/sessions/`
 - `src/parser.ts` - Parses Claude Code's JSONL transcript format (handles user messages, assistant content blocks, tool calls)
 - `src/storage.ts` - SQLite layer with FTS5 full-text search, stores in `~/.claude-recorder/recorder.db`
-- `src/commands/` - CLI commands (list, show, search, export, stats, status)
+- `src/commands/` - CLI commands (list, show, search, export, stats, status, install-hook)
+- `src/config.ts` - Project configuration loading from `.claude-recorder.json`
+- `src/session-export.ts` - Shared markdown formatting and session export to project directories
+- `src/skills/` - Slash command implementations (save-session)
 
 **Transcript Format:** Each JSONL line has `type` (user/assistant), `uuid`, `sessionId`, `timestamp`, `message.content` (string for user, ContentBlock[] for assistant with text/thinking/tool_use/tool_result blocks).
 
@@ -57,6 +62,26 @@ bun cli cleanup                        # Remove stale PID files
 ## Configuration
 
 Hooks are configured in `~/.claude/settings.json` under the `hooks` key. The watcher stores PID files and logs in `~/.claude-recorder/`.
+
+### Project Session Export
+
+To auto-export sessions to a project directory, create `.claude-recorder.json` in the project root:
+
+```json
+{
+  "sessionExport": {
+    "enabled": true,
+    "outputDir": ".claude-sessions",
+    "fileNamePattern": "{datetime}-{slug}"
+  }
+}
+```
+
+**Pattern variables:** `{date}`, `{datetime}`, `{slug}`, `{sessionId}`, `{shortId}`
+
+**Export triggers:**
+- **Pre-commit hook:** Run `bun cli install-hook` to auto-export before each git commit
+- **Skill command:** Use `/save-session` in Claude Code to manually export the current session
 
 ## Git Workflow
 

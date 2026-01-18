@@ -9,6 +9,7 @@ import { statusCommand } from "./commands/status.js";
 import { cleanupCommand } from "./commands/cleanup.js";
 import { stopCommand } from "./commands/stop.js";
 import { startCommand } from "./commands/start.js";
+import { installHookCommand, uninstallHookCommand } from "./commands/install-hook.js";
 
 const program = new Command();
 
@@ -84,6 +85,20 @@ program
   .description("Start the watcher daemon in background")
   .action(() => {
     startCommand();
+  });
+
+program
+  .command("install-hook")
+  .description("Install pre-commit hook in current project for auto-export")
+  .action(() => {
+    installHookCommand();
+  });
+
+program
+  .command("uninstall-hook")
+  .description("Remove pre-commit hook from current project")
+  .action(() => {
+    uninstallHookCommand();
   });
 
 program.parse();

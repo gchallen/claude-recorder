@@ -1,4 +1,5 @@
 import { getSession, getSessionMessages, listSessions } from "../storage.js";
+import { formatMarkdown } from "../session-export.js";
 
 export function exportCommand(
   sessionIdOrIndex: string,
@@ -49,66 +50,4 @@ export function exportCommand(
   } else {
     console.log(output);
   }
-}
-
-function formatMarkdown(
-  session: ReturnType<typeof getSession>,
-  messages: ReturnType<typeof getSessionMessages>
-): string {
-  const lines: string[] = [];
-
-  lines.push(`# ${session!.slug}`);
-  lines.push("");
-  lines.push(`- **Session ID:** ${session!.id}`);
-  lines.push(`- **Started:** ${session!.startTime.toLocaleString()}`);
-  if (session!.endTime) {
-    lines.push(`- **Ended:** ${session!.endTime.toLocaleString()}`);
-  }
-  lines.push(`- **Directory:** ${session!.workingDir}`);
-  lines.push(`- **Messages:** ${messages.length}`);
-  lines.push("");
-  lines.push("---");
-  lines.push("");
-
-  for (const message of messages) {
-    const roleLabel = message.role === "user" ? "**You**" : "**Claude**";
-    const time = message.timestamp.toLocaleTimeString();
-
-    lines.push(`### ${roleLabel} (${time})`);
-    lines.push("");
-
-    if (message.textContent) {
-      lines.push(message.textContent);
-      lines.push("");
-    }
-
-    if (message.toolCalls.length > 0) {
-      for (const tool of message.toolCalls) {
-        lines.push(`<details>`);
-        lines.push(`<summary>Tool: ${tool.name}</summary>`);
-        lines.push("");
-        lines.push("**Input:**");
-        lines.push("```json");
-        lines.push(tool.input);
-        lines.push("```");
-        if (tool.output) {
-          lines.push("");
-          lines.push("**Output:**");
-          lines.push("```");
-          lines.push(tool.output.slice(0, 1000));
-          if (tool.output.length > 1000) {
-            lines.push("... (truncated)");
-          }
-          lines.push("```");
-        }
-        lines.push("</details>");
-        lines.push("");
-      }
-    }
-
-    lines.push("---");
-    lines.push("");
-  }
-
-  return lines.join("\n");
 }

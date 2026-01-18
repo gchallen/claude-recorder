@@ -12,6 +12,8 @@
     "watcher": "bun run src/watcher.ts",
     "hook:start": "bun run src/hooks/session-start.ts",
     "hook:end": "bun run src/hooks/session-end.ts",
+    "hook:pre-commit": "bun run src/hooks/pre-commit.ts",
+    "skill:save-session": "bun run src/skills/save-session.ts",
     "import": "bun run src/import-session.ts"
   },
   "dependencies": {

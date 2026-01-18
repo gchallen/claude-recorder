@@ -77,3 +77,14 @@ export interface HookInput {
   tool_input?: unknown;
   tool_response?: unknown;
 }
+
+// Project configuration (.claude-recorder.json)
+export interface ProjectConfig {
+  sessionExport?: SessionExportConfig;
+}
+
+export interface SessionExportConfig {
+  enabled: boolean;
+  outputDir: string;
+  fileNamePattern: string;
+}
