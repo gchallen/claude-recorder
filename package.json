@@ -16,6 +16,7 @@
     "hook:end": "bun run src/hooks/session-end.ts",
     "hook:pre-commit": "bun run src/hooks/pre-commit.ts",
     "skill:save-session": "bun run src/skills/save-session.ts",
+    "skill:release": "bun run src/skills/release.ts",
     "import": "bun run src/import-session.ts"
   },
   "dependencies": {
