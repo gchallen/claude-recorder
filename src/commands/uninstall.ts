@@ -8,16 +8,15 @@ const BINARY_NAME = "record-claude";
 const CLAUDE_SETTINGS_PATH = join(homedir(), ".claude", "settings.json");
 const RECORDER_DATA_DIR = join(homedir(), ".claude-recorder");
 
-interface HookEntry {
-  type?: string;
+interface HookCommand {
+  type: "command";
   command: string;
   timeout?: number;
 }
 
 interface HookMatcher {
-  hooks?: HookEntry[];
-  command?: string;
-  timeout?: number;
+  matcher?: Record<string, unknown>;
+  hooks: HookCommand[];
 }
 
 interface ClaudeSettings {
@@ -62,41 +61,44 @@ function writeClaudeSettings(settings: ClaudeSettings): void {
   writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2) + "\n");
 }
 
-function isRecorderHook(matcher: HookMatcher): boolean {
-  // Check direct command format
-  if (matcher.command?.includes("record-claude") || matcher.command?.includes("recorder")) {
-    return true;
+function isRecorderHook(entry: unknown): boolean {
+  const matcher = entry as Record<string, unknown>;
+  // Check old format (direct command property)
+  if ("command" in matcher && typeof matcher.command === "string") {
+    if (matcher.command.includes("record-claude") || matcher.command.includes("recorder")) {
+      return true;
+    }
   }
-  // Check nested hooks format
-  if (matcher.hooks) {
+  // Check new format (hooks array)
+  if ("hooks" in matcher && Array.isArray(matcher.hooks)) {
     return matcher.hooks.some(
-      (h) => h.command?.includes("record-claude") || h.command?.includes("recorder")
+      (h: HookCommand) => h.command?.includes("record-claude") || h.command?.includes("recorder")
     );
   }
   return false;
 }
 
-function filterRecorderHooks(matchers: HookMatcher[]): HookMatcher[] {
+function filterRecorderHooks(matchers: unknown[]): HookMatcher[] {
   return matchers
-    .map((matcher) => {
-      // Direct command format - filter out entirely if it's a recorder hook
-      if (matcher.command) {
+    .map((entry) => {
+      const matcher = entry as Record<string, unknown>;
+      // Remove old format entries (direct command property)
+      if ("command" in matcher && typeof matcher.command === "string") {
         if (matcher.command.includes("record-claude") || matcher.command.includes("recorder")) {
           return null;
         }
-        return matcher;
       }
-      // Nested hooks format - filter out recorder hooks from the nested array
-      if (matcher.hooks) {
+      // Handle new format entries (hooks array)
+      if ("hooks" in matcher && Array.isArray(matcher.hooks)) {
         const filtered = matcher.hooks.filter(
-          (h) => !h.command?.includes("record-claude") && !h.command?.includes("recorder")
+          (h: HookCommand) => !h.command?.includes("record-claude") && !h.command?.includes("recorder")
         );
         if (filtered.length === 0) {
           return null;
         }
-        return { ...matcher, hooks: filtered };
+        return { ...matcher, hooks: filtered } as HookMatcher;
       }
-      return matcher;
+      return matcher as HookMatcher;
     })
     .filter((m): m is HookMatcher => m !== null);
 }

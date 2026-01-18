@@ -7,16 +7,15 @@ const LOCAL_BIN = join(homedir(), ".local", "bin");
 const BINARY_NAME = "record-claude";
 const CLAUDE_SETTINGS_PATH = join(homedir(), ".claude", "settings.json");
 
-interface HookEntry {
-  type?: string;
+interface HookCommand {
+  type: "command";
   command: string;
   timeout?: number;
 }
 
 interface HookMatcher {
-  hooks?: HookEntry[];
-  command?: string;
-  timeout?: number;
+  matcher?: Record<string, unknown>;
+  hooks: HookCommand[];
 }
 
 interface ClaudeSettings {
@@ -124,11 +123,6 @@ function writeClaudeSettings(settings: ClaudeSettings): void {
 
 function hasRecorderHook(matchers: HookMatcher[]): boolean {
   for (const matcher of matchers) {
-    // Check direct command format
-    if (matcher.command?.includes("record-claude") || matcher.command?.includes("recorder")) {
-      return true;
-    }
-    // Check nested hooks format
     if (matcher.hooks) {
       for (const hook of matcher.hooks) {
         if (hook.command?.includes("record-claude") || hook.command?.includes("recorder")) {
@@ -140,24 +134,29 @@ function hasRecorderHook(matchers: HookMatcher[]): boolean {
   return false;
 }
 
-function removeRecorderHooks(matchers: HookMatcher[]): HookMatcher[] {
-  return matchers.filter((matcher) => {
-    // Check direct command format
-    if (matcher.command?.includes("record-claude") || matcher.command?.includes("recorder")) {
-      return false;
-    }
-    // Check nested hooks format - filter out matchers that only have recorder hooks
-    if (matcher.hooks) {
-      const nonRecorderHooks = matcher.hooks.filter(
-        (h) => !h.command?.includes("record-claude") && !h.command?.includes("recorder")
-      );
-      if (nonRecorderHooks.length === 0) {
-        return false;
+function removeRecorderHooks(matchers: unknown[]): HookMatcher[] {
+  return matchers
+    .map((entry) => {
+      const matcher = entry as Record<string, unknown>;
+      // Remove old format entries (direct command property)
+      if ("command" in matcher && typeof matcher.command === "string") {
+        if (matcher.command.includes("record-claude") || matcher.command.includes("recorder")) {
+          return null;
+        }
       }
-      matcher.hooks = nonRecorderHooks;
-    }
-    return true;
-  });
+      // Handle new format entries (hooks array)
+      if ("hooks" in matcher && Array.isArray(matcher.hooks)) {
+        const nonRecorderHooks = matcher.hooks.filter(
+          (h: HookCommand) => !h.command?.includes("record-claude") && !h.command?.includes("recorder")
+        );
+        if (nonRecorderHooks.length === 0) {
+          return null;
+        }
+        return { ...matcher, hooks: nonRecorderHooks } as HookMatcher;
+      }
+      return matcher as HookMatcher;
+    })
+    .filter((m): m is HookMatcher => m !== null);
 }
 
 function configureHooks(): { sessionStart: boolean; sessionEnd: boolean } {
@@ -178,15 +177,19 @@ function configureHooks(): { sessionStart: boolean; sessionEnd: boolean } {
   const cleanedStartHooks = removeRecorderHooks(existingStartHooks);
   const cleanedEndHooks = removeRecorderHooks(existingEndHooks);
 
-  // Add new recorder hooks using the simple format
+  // Add new recorder hooks using the matcher format
   settings.hooks.SessionStart = [
     ...cleanedStartHooks,
-    { command: sessionStartCommand, timeout: 5000 },
+    {
+      hooks: [{ type: "command", command: sessionStartCommand, timeout: 5000 }],
+    },
   ];
 
   settings.hooks.SessionEnd = [
     ...cleanedEndHooks,
-    { command: sessionEndCommand, timeout: 5000 },
+    {
+      hooks: [{ type: "command", command: sessionEndCommand, timeout: 5000 }],
+    },
   ];
 
   writeClaudeSettings(settings);

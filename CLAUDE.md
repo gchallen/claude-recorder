@@ -92,10 +92,18 @@ For standalone binary (configured by `record-claude install`):
 {
   "hooks": {
     "SessionStart": [
-      { "command": "~/.local/bin/record-claude hook session-start", "timeout": 5000 }
+      {
+        "hooks": [
+          { "type": "command", "command": "~/.local/bin/record-claude hook session-start", "timeout": 5000 }
+        ]
+      }
     ],
     "SessionEnd": [
-      { "command": "~/.local/bin/record-claude hook session-end", "timeout": 5000 }
+      {
+        "hooks": [
+          { "type": "command", "command": "~/.local/bin/record-claude hook session-end", "timeout": 5000 }
+        ]
+      }
     ]
   }
 }
@@ -106,10 +114,18 @@ For development mode (manual configuration):
 {
   "hooks": {
     "SessionStart": [
-      { "command": "bun run ~/claude/recorder/src/hooks/session-start.ts" }
+      {
+        "hooks": [
+          { "type": "command", "command": "bun run ~/claude/recorder/src/hooks/session-start.ts" }
+        ]
+      }
     ],
     "SessionEnd": [
-      { "command": "bun run ~/claude/recorder/src/hooks/session-end.ts" }
+      {
+        "hooks": [
+          { "type": "command", "command": "bun run ~/claude/recorder/src/hooks/session-end.ts" }
+        ]
+      }
     ]
   }
 }

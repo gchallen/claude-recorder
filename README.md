@@ -58,10 +58,18 @@ If you prefer to run from source:
    {
      "hooks": {
        "SessionStart": [
-         { "command": "bun run ~/claude/recorder/src/hooks/session-start.ts" }
+         {
+           "hooks": [
+             { "type": "command", "command": "bun run ~/claude/recorder/src/hooks/session-start.ts" }
+           ]
+         }
        ],
        "SessionEnd": [
-         { "command": "bun run ~/claude/recorder/src/hooks/session-end.ts" }
+         {
+           "hooks": [
+             { "type": "command", "command": "bun run ~/claude/recorder/src/hooks/session-end.ts" }
+           ]
+         }
        ]
      }
    }
