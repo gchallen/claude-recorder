@@ -32,7 +32,8 @@ if (messages.length > 0) {
 
   // Get slug from session ID or directory
   const projectDir = dirname(transcriptPath);
-  const slug = basename(projectDir).replace(/-Users-challen-/g, "").replace(/-/g, "/");
+  // Claude encodes paths like "-Users-username-projects-foo", extract meaningful part
+  const slug = basename(projectDir).replace(/^-Users-[^-]+-/, "").replace(/-/g, "/");
 
   // Insert session
   upsertSession(

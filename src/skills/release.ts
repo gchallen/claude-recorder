@@ -139,8 +139,20 @@ async function main(): Promise<void> {
   }
   console.log(`✓ Created GitHub release`);
 
+  // Get repo URL from git remote
+  const remoteUrl = await run(["git", "remote", "get-url", "origin"]);
+  let repoUrl = "";
+  if (remoteUrl.exitCode === 0) {
+    // Convert git@github.com:user/repo.git to https://github.com/user/repo
+    repoUrl = remoteUrl.stdout
+      .replace(/^git@github\.com:/, "https://github.com/")
+      .replace(/\.git$/, "");
+  }
+
   console.log(`\n✅ Release ${version} published successfully!`);
-  console.log(`\nView at: https://github.com/gchallen/claude-recorder/releases/tag/${version}`);
+  if (repoUrl) {
+    console.log(`\nView at: ${repoUrl}/releases/tag/${version}`);
+  }
 }
 
 main().catch((err) => {
