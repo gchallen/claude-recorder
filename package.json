@@ -9,6 +9,8 @@
     "stop": "bun run src/index.ts stop",
     "status": "bun run src/index.ts status",
     "test": "bun test",
+    "build": "bun run scripts/build.ts",
+    "build:local": "bun build --compile --outfile=dist/recorder ./src/index.ts",
     "watcher": "bun run src/watcher.ts",
     "hook:start": "bun run src/hooks/session-start.ts",
     "hook:end": "bun run src/hooks/session-end.ts",
