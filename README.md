@@ -17,7 +17,12 @@ Records all Claude Code CLI activity for personal review and analytics. Captures
    - Linux ARM64: `recorder-linux-arm64`
    - Windows: `recorder-windows-x64.exe`
 
-2. Run the install command:
+2. On macOS, remove the quarantine attribute (required for unsigned binaries):
+   ```bash
+   xattr -d com.apple.quarantine recorder-macos-arm64
+   ```
+
+3. Run the install command:
    ```bash
    chmod +x recorder-macos-arm64  # make executable (macOS/Linux)
    ./recorder-macos-arm64 install
@@ -28,7 +33,7 @@ Records all Claude Code CLI activity for personal review and analytics. Captures
    - Add `~/.local/bin` to your PATH if needed
    - Configure Claude Code hooks in `~/.claude/settings.json`
 
-3. Restart your terminal and Claude Code to activate recording.
+4. Restart your terminal and Claude Code to activate recording.
 
 ### Build from Source
 
