@@ -10,6 +10,7 @@ import {
   getFilePosition,
   setFilePosition,
   endSession,
+  getSession,
 } from "./storage.js";
 import type { TranscriptEntry } from "./types.js";
 
@@ -65,6 +66,25 @@ function getSessionMetadata(transcriptPath: string): {
   return null;
 }
 
+function ensureSessionExists(session: WatchedSession): void {
+  const existing = getSession(session.sessionId);
+  if (existing) return;
+
+  const metadata = getSessionMetadata(session.transcriptPath);
+  if (metadata) {
+    upsertSession(
+      metadata.sessionId,
+      metadata.slug,
+      metadata.projectPath,
+      metadata.workingDir,
+      new Date(),
+      metadata.version,
+      session.transcriptPath
+    );
+    log(`[${session.sessionId.slice(0, 8)}] Created missing session row`);
+  }
+}
+
 function processTranscript(session: WatchedSession): void {
   const { transcriptPath } = session;
 
@@ -89,6 +109,9 @@ function processTranscript(session: WatchedSession): void {
   const messages = parseTranscriptContent(newContent);
 
   if (messages.length > 0) {
+    // Ensure the session row exists before inserting messages
+    ensureSessionExists(session);
+
     log(`[${session.sessionId.slice(0, 8)}] Processing ${messages.length} new messages`);
     for (const message of messages) {
       insertMessage(message);

@@ -13,6 +13,7 @@ import { installHookCommand, uninstallHookCommand } from "./commands/install-hoo
 import { hookSessionStartCommand, hookSessionEndCommand } from "./commands/hook.js";
 import { installCommand } from "./commands/install.js";
 import { uninstallCommand } from "./commands/uninstall.js";
+import { repairCommand } from "./commands/repair.js";
 import { startDaemon } from "./watcher.js";
 
 const program = new Command();
@@ -136,6 +137,13 @@ program
   .option("--all", "Also remove recorded data")
   .action((options) => {
     uninstallCommand({ all: options.all });
+  });
+
+program
+  .command("repair")
+  .description("Find and repair orphaned sessions (messages without session metadata)")
+  .action(() => {
+    repairCommand();
   });
 
 // Hidden daemon command for internal use
