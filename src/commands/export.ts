@@ -7,22 +7,20 @@ export function exportCommand(
 ): void {
   let sessionId = sessionIdOrIndex;
 
-  // Handle numeric index
-  if (/^\d+$/.test(sessionIdOrIndex)) {
-    const index = parseInt(sessionIdOrIndex);
-    const sessions = listSessions(index + 1);
-    if (index >= sessions.length) {
-      console.error(`Session index ${index} not found`);
-      process.exit(1);
-    }
-    sessionId = sessions[index].id;
-  }
-
-  // Handle short ID
+  // Handle short ID (try prefix match first, before numeric index)
   if (sessionId.length < 36) {
     const match = findSessionByPrefix(sessionId);
     if (match) {
       sessionId = match.id;
+    } else if (/^\d+$/.test(sessionIdOrIndex)) {
+      // Fall back to numeric index if no session prefix matched
+      const index = parseInt(sessionIdOrIndex);
+      const sessions = listSessions(index + 1);
+      if (index >= sessions.length) {
+        console.error(`Session index ${index} not found`);
+        process.exit(1);
+      }
+      sessionId = sessions[index].id;
     }
   }
 
