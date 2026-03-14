@@ -140,6 +140,18 @@ bun cli stats                           # View statistics
 3. Parser extracts messages and tool calls, stores in SQLite with FTS5
 4. Claude Code fires `SessionEnd` hook → unregisters session, daemon finalizes it
 
+## Troubleshooting
+
+### Orphaned Sessions
+
+If sessions appear in search results but can't be shown or exported, their metadata may be missing from the database. This can happen if the watcher daemon wasn't running or crashed during a session. To repair:
+
+```bash
+record-claude repair
+```
+
+This scans for orphaned messages, locates their transcript files, and recreates missing session rows. The daemon also runs this check automatically on startup.
+
 ## Uninstalling
 
 To remove Claude Recorder:

@@ -13,6 +13,7 @@ import {
   getSession,
 } from "./storage.js";
 import type { TranscriptEntry } from "./types.js";
+import { countOrphanedSessions, repairOrphanedSessions } from "./repair.js";
 
 const RUN_DIR = join(homedir(), ".claude-recorder", "run");
 const SESSIONS_DIR = join(RUN_DIR, "sessions");
@@ -274,6 +275,14 @@ export function startDaemon(): void {
 
   // Initialize database
   getDatabase();
+
+  // Repair any orphaned sessions from prior runs
+  const orphanCount = countOrphanedSessions();
+  if (orphanCount > 0) {
+    log(`Found ${orphanCount} orphaned session(s), repairing...`);
+    const result = repairOrphanedSessions((msg) => log(msg));
+    log(`Repaired ${result.repaired} session(s)`);
+  }
 
   writePidFile();
 
