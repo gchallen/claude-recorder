@@ -1,4 +1,4 @@
-import { getSession, getSessionMessages, listSessions } from "../storage.js";
+import { findSessionByPrefix, getSession, getSessionMessages, listSessions } from "../storage.js";
 import { formatMarkdown } from "../session-export.js";
 
 export function exportCommand(
@@ -20,8 +20,7 @@ export function exportCommand(
 
   // Handle short ID
   if (sessionId.length < 36) {
-    const sessions = listSessions(100);
-    const match = sessions.find((s) => s.id.startsWith(sessionId));
+    const match = findSessionByPrefix(sessionId);
     if (match) {
       sessionId = match.id;
     }

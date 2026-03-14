@@ -329,6 +329,39 @@ export function getSession(sessionId: string): Session | null {
   };
 }
 
+export function findSessionByPrefix(prefix: string): Session | null {
+  const db = getDatabase();
+  const rows = db
+    .query<
+      {
+        id: string;
+        slug: string;
+        project_path: string;
+        working_dir: string;
+        start_time: string;
+        end_time: string | null;
+        message_count: number;
+        version: string;
+      },
+      [string]
+    >(`SELECT * FROM sessions WHERE id LIKE ? || '%'`)
+    .all(prefix);
+
+  if (rows.length !== 1) return null;
+
+  const row = rows[0];
+  return {
+    id: row.id,
+    slug: row.slug,
+    projectPath: row.project_path,
+    workingDir: row.working_dir,
+    startTime: new Date(row.start_time),
+    endTime: row.end_time ? new Date(row.end_time) : null,
+    messageCount: row.message_count,
+    version: row.version,
+  };
+}
+
 export function getSessionMessages(sessionId: string): ParsedMessage[] {
   const db = getDatabase();
   const messages = db
