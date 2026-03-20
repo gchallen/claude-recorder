@@ -387,38 +387,50 @@ export function getSessionMessages(sessionId: string): ParsedMessage[] {
     )
     .all(sessionId);
 
-  return messages.map((msg) => {
-    const toolCalls = db
-      .query<
-        {
-          tool_id: string;
-          name: string;
-          input: string;
-          output: string | null;
-        },
-        [string]
-      >(
-        `SELECT tool_id, name, input, output FROM tool_calls WHERE message_uuid = ?`
-      )
-      .all(msg.uuid);
+  const allToolCalls = db
+    .query<
+      {
+        message_uuid: string;
+        tool_id: string;
+        name: string;
+        input: string;
+        output: string | null;
+      },
+      [string]
+    >(
+      `SELECT message_uuid, tool_id, name, input, output FROM tool_calls WHERE session_id = ? ORDER BY id`
+    )
+    .all(sessionId);
 
-    return {
-      uuid: msg.uuid,
-      sessionId: msg.session_id,
-      timestamp: new Date(msg.timestamp),
-      role: msg.role as "user" | "assistant",
-      textContent: msg.text_content,
-      thinkingContent: msg.thinking_content,
-      toolCalls: toolCalls.map((tc) => ({
-        id: tc.tool_id,
-        name: tc.name,
-        input: tc.input,
-        output: tc.output,
-      })),
-      model: msg.model,
-      cwd: msg.cwd,
-    };
-  });
+  const toolCallsByMessage = new Map<
+    string,
+    Array<{ id: string; name: string; input: string; output: string | null }>
+  >();
+  for (const tc of allToolCalls) {
+    let list = toolCallsByMessage.get(tc.message_uuid);
+    if (!list) {
+      list = [];
+      toolCallsByMessage.set(tc.message_uuid, list);
+    }
+    list.push({
+      id: tc.tool_id,
+      name: tc.name,
+      input: tc.input,
+      output: tc.output,
+    });
+  }
+
+  return messages.map((msg) => ({
+    uuid: msg.uuid,
+    sessionId: msg.session_id,
+    timestamp: new Date(msg.timestamp),
+    role: msg.role as "user" | "assistant",
+    textContent: msg.text_content,
+    thinkingContent: msg.thinking_content,
+    toolCalls: toolCallsByMessage.get(msg.uuid) ?? [],
+    model: msg.model,
+    cwd: msg.cwd,
+  }));
 }
 
 export function searchMessages(
