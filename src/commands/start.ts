@@ -12,13 +12,16 @@ export function startCommand(): void {
     return;
   }
 
-  const watcherPath = join(RECORDER_DIR, "src", "watcher.ts");
-
-  const child = spawn("bun", ["run", watcherPath], {
-    detached: true,
-    stdio: "ignore",
-    cwd: RECORDER_DIR,
-  });
+  // A compiled binary can't run its bundled sources with bun, so re-invoke
+  // the binary itself with the hidden "daemon" command instead.
+  const isCompiled = import.meta.path.startsWith("/$bunfs/");
+  const child = isCompiled
+    ? spawn(process.execPath, ["daemon"], { detached: true, stdio: "ignore" })
+    : spawn("bun", ["run", join(RECORDER_DIR, "src", "watcher.ts")], {
+        detached: true,
+        stdio: "ignore",
+        cwd: RECORDER_DIR,
+      });
 
   child.unref();
   console.log(chalk.green(`Daemon started (PID ${child.pid})`));
