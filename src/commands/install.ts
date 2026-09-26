@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, chmodSync } from "fs";
 import { homedir } from "os";
 import { join, basename } from "path";
+import { spawnSync } from "child_process";
 import chalk from "chalk";
 
 const LOCAL_BIN = join(homedir(), ".local", "bin");
@@ -49,6 +50,20 @@ function info(message: string): void {
 
 function getBinaryPath(): string {
   return join(LOCAL_BIN, BINARY_NAME);
+}
+
+// On macOS, a copied Bun-compiled binary can end up with an invalid signature,
+// which makes the kernel kill it on launch (exit 137). Re-sign it ad hoc.
+function adHocSign(path: string): boolean {
+  if (process.platform !== "darwin") {
+    return true;
+  }
+  const sign = spawnSync("codesign", ["--force", "-s", "-", path], { stdio: "ignore" });
+  if (sign.status !== 0) {
+    return false;
+  }
+  const verify = spawnSync("codesign", ["-v", path], { stdio: "ignore" });
+  return verify.status === 0;
 }
 
 function isInLocalBin(): boolean {
@@ -245,6 +260,12 @@ export function installCommand(): void {
         copyFileSync(currentExec, targetPath);
         chmodSync(targetPath, 0o755);
         success(`Binary installed to ${targetPath}`);
+        if (adHocSign(targetPath)) {
+          success("Binary signed (ad hoc)");
+        } else {
+          warning(`Failed to sign binary; run: codesign --force -s - ${targetPath}`);
+          hasWarnings = true;
+        }
       } catch (err) {
         error(`Failed to copy binary: ${err}`);
         return;
