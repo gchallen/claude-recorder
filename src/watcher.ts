@@ -14,6 +14,7 @@ import {
 } from "./storage.js";
 import type { TranscriptEntry } from "./types.js";
 import { countOrphanedSessions, repairOrphanedSessions } from "./repair.js";
+import { canonicalPath } from "./paths.js";
 
 const RUN_DIR = join(homedir(), ".claude-recorder", "run");
 const SESSIONS_DIR = join(RUN_DIR, "sessions");
@@ -87,11 +88,14 @@ function ensureSessionExists(session: WatchedSession): void {
 }
 
 function processTranscript(session: WatchedSession): void {
-  const { transcriptPath } = session;
-
-  if (!existsSync(transcriptPath)) {
+  if (!existsSync(session.transcriptPath)) {
     return;
   }
+
+  // Key everything by the canonical path so the same transcript reached through
+  // different CLAUDE_CONFIG_DIR symlinks is read once.
+  session.transcriptPath = canonicalPath(session.transcriptPath);
+  const { transcriptPath } = session;
 
   const position = getFilePosition(transcriptPath);
 
@@ -139,7 +143,7 @@ function scanForSessions(): void {
       // New session to watch
       const sessionFile = join(SESSIONS_DIR, file);
       try {
-        const transcriptPath = readFileSync(sessionFile, "utf-8").trim();
+        const transcriptPath = canonicalPath(readFileSync(sessionFile, "utf-8").trim());
 
         if (!existsSync(transcriptPath)) {
           log(`[${sessionId.slice(0, 8)}] Transcript not found: ${transcriptPath}`);
@@ -244,7 +248,7 @@ export function registerSession(sessionId: string, transcriptPath: string): void
     mkdirSync(SESSIONS_DIR, { recursive: true });
   }
   const sessionFile = join(SESSIONS_DIR, sessionId);
-  writeFileSync(sessionFile, transcriptPath);
+  writeFileSync(sessionFile, canonicalPath(transcriptPath));
 }
 
 export function unregisterSession(sessionId: string): void {

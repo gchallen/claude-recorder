@@ -136,7 +136,7 @@ bun cli stats                           # View statistics
 ## How It Works
 
 1. Claude Code fires `SessionStart` hook → registers session, starts daemon if needed
-2. Single daemon monitors all active sessions in `~/.claude/projects/<project>/<session>.jsonl`
+2. Single daemon monitors all active sessions in `~/.claude/projects/<project>/<session>.jsonl` (`CLAUDE_CONFIG_DIR` is honored, and transcript paths are canonicalized through symlinks so several config dirs can share one `projects/`)
 3. Parser extracts messages and tool calls, stores in SQLite with FTS5
 4. Claude Code fires `SessionEnd` hook → unregisters session, daemon finalizes it
 

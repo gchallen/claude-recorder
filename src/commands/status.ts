@@ -71,12 +71,12 @@ export function statusCommand(): void {
       const transcriptPath = transcriptPaths.get(sessionId);
       if (transcriptPath) {
         // Extract working dir from transcript path
-        // Path format: ~/.claude/projects/-Users-foo-bar/<session>.jsonl
+        // Path format: <config dir>/projects/-Users-foo-bar/<session>.jsonl
         // We want to show: ~/foo/bar
         const home = homedir();
         let projectDir = transcriptPath
           .replace(/\/[^/]+\.jsonl$/, "") // Remove filename
-          .replace(/^.*\/\.claude\/projects\//, "") // Remove .claude/projects prefix
+          .replace(/^.*\/\.claude[^/]*\/projects\//, "") // Remove <.claude*>/projects prefix
           .replace(/^-/, "") // Remove leading dash
           .replace(/-/g, "/"); // Convert dashes to slashes
         // Replace home directory with ~

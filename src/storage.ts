@@ -100,6 +100,32 @@ function initializeSchema(db: Database): void {
       last_updated TEXT NOT NULL
     );
   `);
+
+  ensureToolCallsUnique(db);
+}
+
+/**
+ * One-time migration: tool_calls had no uniqueness, so re-reading a transcript
+ * (e.g. after a path change) inserted duplicates despite INSERT OR IGNORE.
+ * De-duplicate once, then add the unique index that makes the ignore effective.
+ */
+function ensureToolCallsUnique(db: Database): void {
+  const existing = db
+    .query<{ name: string }, [string]>(
+      `SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?`
+    )
+    .get("idx_tool_calls_unique");
+  if (existing) return;
+
+  const removed = db.run(
+    `DELETE FROM tool_calls WHERE id NOT IN (SELECT MIN(id) FROM tool_calls GROUP BY tool_id, message_uuid)`
+  ).changes;
+  if (removed > 0) {
+    console.error(`[storage] Removed ${removed} duplicate tool_calls row(s) before adding unique index`);
+  }
+  db.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_tool_calls_unique ON tool_calls(tool_id, message_uuid)`
+  );
 }
 
 export function upsertSession(

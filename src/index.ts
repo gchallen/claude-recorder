@@ -21,7 +21,7 @@ const program = new Command();
 program
   .name("record-claude")
   .description("Record and search Claude Code CLI activity")
-  .version("2026.1.1");
+  .version("2026.10.0");
 
 program
   .command("list")

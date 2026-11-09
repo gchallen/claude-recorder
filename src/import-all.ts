@@ -1,15 +1,15 @@
 #!/usr/bin/env bun
 /**
- * Import all existing transcripts from ~/.claude/projects/
+ * Import all existing transcripts from <config dir>/projects/ (honors CLAUDE_CONFIG_DIR)
  */
 
 import { readdirSync, statSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
 import { parseTranscriptFile } from "./parser.js";
+import { claudeProjectsDir } from "./paths.js";
 import { upsertSession, insertMessage, getDatabase, getSession } from "./storage.js";
 
-const PROJECTS_DIR = join(homedir(), ".claude", "projects");
+const PROJECTS_DIR = claudeProjectsDir();
 
 function importTranscript(transcriptPath: string): { imported: number; skipped: boolean } {
   try {

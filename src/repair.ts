@@ -1,7 +1,7 @@
 import { readdirSync, statSync, readFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
-import { homedir } from "os";
 import { getDatabase, upsertSession } from "./storage.js";
+import { canonicalPath, claudeProjectsDir } from "./paths.js";
 import type { TranscriptEntry } from "./types.js";
 
 interface RepairResult {
@@ -48,8 +48,8 @@ export function repairOrphanedSessions(logger?: (msg: string) => void): RepairRe
     return { orphanCount: 0, repaired: 0, notRecoverable: 0 };
   }
 
-  // Build a map of session ID → transcript path by scanning ~/.claude/projects/
-  const projectsDir = join(homedir(), ".claude", "projects");
+  // Build a map of session ID → transcript path by scanning <config dir>/projects/
+  const projectsDir = claudeProjectsDir();
   const transcriptMap = new Map<string, string>();
 
   if (existsSync(projectsDir)) {
@@ -73,10 +73,11 @@ export function repairOrphanedSessions(logger?: (msg: string) => void): RepairRe
     .all();
 
   for (const fp of filePositions) {
-    if (existsSync(fp.transcript_path)) {
-      const filename = fp.transcript_path.split("/").pop() ?? "";
+    const path = canonicalPath(fp.transcript_path);
+    if (existsSync(path)) {
+      const filename = path.split("/").pop() ?? "";
       const sessionId = filename.replace(".jsonl", "");
-      transcriptMap.set(sessionId, fp.transcript_path);
+      transcriptMap.set(sessionId, path);
     }
   }
 

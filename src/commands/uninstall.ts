@@ -2,10 +2,11 @@ import { existsSync, readFileSync, writeFileSync, unlinkSync, rmSync } from "fs"
 import { homedir } from "os";
 import { join } from "path";
 import chalk from "chalk";
+import { claudeConfigDir } from "../paths.js";
 
 const LOCAL_BIN = join(homedir(), ".local", "bin");
 const BINARY_NAME = "record-claude";
-const CLAUDE_SETTINGS_PATH = join(homedir(), ".claude", "settings.json");
+const CLAUDE_SETTINGS_PATH = join(claudeConfigDir(), "settings.json");
 const RECORDER_DATA_DIR = join(homedir(), ".claude-recorder");
 
 interface HookCommand {
@@ -183,7 +184,7 @@ export function uninstallCommand(options: { all?: boolean } = {}): void {
   // Remove hooks from Claude settings
   console.log("Removing Claude Code hooks...");
   if (removeHooks()) {
-    success("Hooks removed from ~/.claude/settings.json");
+    success(`Hooks removed from ${CLAUDE_SETTINGS_PATH}`);
   } else {
     info("No recorder hooks found");
   }

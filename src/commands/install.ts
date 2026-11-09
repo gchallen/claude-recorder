@@ -3,10 +3,11 @@ import { homedir } from "os";
 import { join, basename } from "path";
 import { spawnSync } from "child_process";
 import chalk from "chalk";
+import { claudeConfigDir } from "../paths.js";
 
 const LOCAL_BIN = join(homedir(), ".local", "bin");
 const BINARY_NAME = "record-claude";
-const CLAUDE_SETTINGS_PATH = join(homedir(), ".claude", "settings.json");
+const CLAUDE_SETTINGS_PATH = join(claudeConfigDir(), "settings.json");
 
 interface HookCommand {
   type: "command";
@@ -128,7 +129,7 @@ function readClaudeSettings(): ClaudeSettings {
 }
 
 function writeClaudeSettings(settings: ClaudeSettings): void {
-  const claudeDir = join(homedir(), ".claude");
+  const claudeDir = claudeConfigDir();
   if (!existsSync(claudeDir)) {
     mkdirSync(claudeDir, { recursive: true });
   }
